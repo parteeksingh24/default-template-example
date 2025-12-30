@@ -1,25 +1,16 @@
-import { type ChangeEvent, useCallback, useEffect, useState } from 'react';
+import { type ChangeEvent, useCallback, useState } from 'react';
 
 const WORKBENCH_PATH = process.env.AGENTUITY_PUBLIC_WORKBENCH_PATH;
 
 const DEFAULT_TEXT =
-	'Welcome to Agentuity! This translation agent shows what you can build with the platform. It connects to AI models through our gateway, saves your history using thread state, and runs quality checks automatically. Try translating this text into different languages to see the agent in action.';
+	'Welcome to Agentuity! This translation agent shows what you can build with the platform. It connects to AI models through our gateway, tracks usage with thread state, and runs quality checks automatically. Try translating this text into different languages to see the agent in action.';
 
 const LANGUAGES = ['Spanish', 'French', 'German', 'Japanese', 'Chinese'] as const;
-
-interface HistoryEntry {
-	text: string;
-	toLanguage: string;
-	translation: string;
-	wordCount: number;
-	timestamp: string;
-}
 
 interface TranslationResponse {
 	translation: string;
 	wordCount: number;
 	tokens: number;
-	history: HistoryEntry[];
 	threadId: string;
 	translationCount: number;
 }
@@ -51,50 +42,6 @@ export function App() {
 			setTranslating(false);
 		}
 	}, [text, toLanguage]);
-
-	const handleClearHistory = useCallback(async () => {
-		try {
-			const response = await fetch('/api/translate', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ command: 'clear' }),
-			});
-
-			if (!response.ok) {
-				throw new Error(`HTTP ${response.status}`);
-			}
-
-			const data = await response.json();
-			setResult(data);
-		} catch (error) {
-			console.error('Clear failed:', error);
-		}
-	}, []);
-
-	// Fetch existing history on page load
-	useEffect(() => {
-		const fetchHistory = async () => {
-			try {
-				const response = await fetch('/api/translate', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({}),
-				});
-
-				if (response.ok) {
-					const data = await response.json();
-					// Only set if there's history (don't overwrite with empty result)
-					if (data.history?.length > 0) {
-						setResult(data);
-					}
-				}
-			} catch (error) {
-				// Silently fail - history is optional
-			}
-		};
-
-		fetchHistory();
-	}, []);
 
 	return (
 		<div className="app-container">
@@ -199,6 +146,14 @@ export function App() {
 										</span>
 									</>
 								)}
+								{result.translationCount > 0 && (
+									<>
+										<span className="separator">|</span>
+										<span>
+											Session: <strong>{result.translationCount}</strong>
+										</span>
+									</>
+								)}
 							</div>
 						</div>
 					) : (
@@ -209,38 +164,6 @@ export function App() {
 								'Translation will appear here'
 							)}
 						</div>
-					)}
-				</div>
-
-				<div className="card">
-					<div className="section-header">
-						<h3 className="section-title">Recent Translations</h3>
-						{result?.history && result.history.length > 0 && (
-							<button
-								className="clear-btn"
-								onClick={handleClearHistory}
-								type="button"
-							>
-								Clear
-							</button>
-						)}
-					</div>
-					{result?.history && result.history.length > 0 ? (
-						<div className="history-list">
-							{result.history.map((entry, index) => (
-								<div key={`${entry.timestamp}-${index}`} className="history-item">
-									<span className="history-text">{entry.text}</span>
-									<span className="history-arrow">→</span>
-									<span className="history-lang">{entry.toLanguage}</span>
-									<span className="history-translation">{entry.translation}</span>
-								</div>
-							))}
-						</div>
-					) : (
-						<p className="empty-state">
-							Translation history is stored using thread state, which persists across requests
-							for the same user session.
-						</p>
 					)}
 				</div>
 
@@ -277,7 +200,7 @@ export function App() {
 							{
 								key: 'threads',
 								title: 'Thread State',
-								text: <>Translation history persists across requests using thread state.</>,
+								text: <>Translation count persists across requests using thread state.</>,
 							},
 							WORKBENCH_PATH
 								? {
@@ -607,88 +530,12 @@ export function App() {
 						opacity: 0.5;
 					}
 
-					.section-header {
-						align-items: center;
-						display: flex;
-						justify-content: space-between;
-						margin-bottom: 1.5rem;
-					}
-
 					.section-title {
 						color: #fff;
 						font-size: 1.25rem;
 						font-weight: 400;
 						line-height: 1;
 						margin: 0 0 1.5rem 0;
-					}
-
-					.section-header .section-title {
-						margin: 0;
-					}
-
-					.clear-btn {
-						background: transparent;
-						border: 1px solid #3f3f46;
-						border-radius: 0.25rem;
-						color: #71717a;
-						cursor: pointer;
-						font-size: 0.75rem;
-						padding: 0.25rem 0.5rem;
-						transition: all 0.2s;
-					}
-
-					.clear-btn:hover {
-						border-color: #ef4444;
-						color: #ef4444;
-					}
-
-					.history-list {
-						display: flex;
-						flex-direction: column;
-						gap: 0.75rem;
-					}
-
-					.history-item {
-						display: grid;
-						grid-template-columns: 1fr auto auto 1fr;
-						align-items: center;
-						gap: 0.75rem;
-						font-size: 0.85rem;
-					}
-
-					.history-text {
-						color: #71717a;
-						overflow: hidden;
-						text-overflow: ellipsis;
-						white-space: nowrap;
-					}
-
-					.history-arrow {
-						color: #3f3f46;
-					}
-
-					.history-lang {
-						background: #18181b;
-						border-radius: 0.25rem;
-						color: #a1a1aa;
-						font-size: 0.75rem;
-						padding: 0.25rem 0.5rem;
-						text-align: center;
-						min-width: 4.5rem;
-					}
-
-					.history-translation {
-						color: #d4d4d8;
-						overflow: hidden;
-						text-overflow: ellipsis;
-						white-space: nowrap;
-					}
-
-					.empty-state {
-						color: #52525b;
-						font-size: 0.875rem;
-						font-style: italic;
-						margin: 0;
 					}
 
 					.steps-list {
