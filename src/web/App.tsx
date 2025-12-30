@@ -1,11 +1,46 @@
 import { useAPI } from '@agentuity/react';
-import { type ChangeEvent, useState } from 'react';
+import { type ChangeEvent, useCallback, useState } from 'react';
 
 const WORKBENCH_PATH = process.env.AGENTUITY_PUBLIC_WORKBENCH_PATH;
 
+const DEFAULT_TEXT =
+	'Welcome to Agentuity! This translation agent demonstrates how to build AI-powered applications with typed schemas, automatic evaluations, and session history. Try translating this text into different languages to see the agent in action.';
+
+const LANGUAGES = ['Spanish', 'French', 'German', 'Japanese', 'Chinese'] as const;
+
+interface HistoryEntry {
+	text: string;
+	toLanguage: string;
+	translation: string;
+	wordCount: number;
+	timestamp: string;
+}
+
+interface TranslationResponse {
+	translation: string;
+	wordCount: number;
+	history: HistoryEntry[];
+	threadId: string;
+	translationCount: number;
+}
+
 export function App() {
-	const [name, setName] = useState('World');
-	const { data: greeting, invoke, isLoading: running } = useAPI('POST /api/hello');
+	const [text, setText] = useState(DEFAULT_TEXT);
+	const [toLanguage, setToLanguage] = useState<(typeof LANGUAGES)[number]>('Spanish');
+
+	const {
+		data: result,
+		invoke: translate,
+		isLoading: translating,
+	} = useAPI('POST /api/translate') as {
+		data: TranslationResponse | undefined;
+		invoke: (data: { text: string; toLanguage: string }) => void;
+		isLoading: boolean;
+	};
+
+	const handleTranslate = useCallback(() => {
+		translate({ text, toLanguage });
+	}, [text, toLanguage, translate]);
 
 	return (
 		<div className="app-container">
@@ -35,83 +70,135 @@ export function App() {
 						/>
 					</svg>
 
-					<h1 className="title">Welcome to Agentuity</h1>
+					<h1 className="title">Translation Agent</h1>
 
 					<p className="subtitle">
-						The <span className="italic">Full-Stack</span> Platform for AI Agents
+						Powered by <span className="italic">Agentuity</span>
 					</p>
 				</div>
 
 				<div className="card card-interactive">
 					<h2 className="card-title">
-						Try the <span className="highlight">Hello Agent</span>
+						Translate to{' '}
+						<select
+							className="inline-select"
+							disabled={translating}
+							onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+								setToLanguage(e.currentTarget.value as (typeof LANGUAGES)[number])
+							}
+							value={toLanguage}
+						>
+							{LANGUAGES.map((lang) => (
+								<option key={lang} value={lang}>
+									{lang}
+								</option>
+							))}
+						</select>
 					</h2>
 
-					<div className="input-group">
-						<input
-							className="input"
-							disabled={running}
-							onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.currentTarget.value)}
-							placeholder="Enter your name"
-							type="text"
-							value={name}
+					<div className="form-group">
+						<textarea
+							className="textarea"
+							disabled={translating}
+							onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setText(e.currentTarget.value)}
+							placeholder="Enter text to translate..."
+							rows={4}
+							value={text}
 						/>
 
 						<div className="glow-btn">
 							<div className="glow-bg" />
 							<div className="glow-effect" />
 							<button
-								className={`button ${running ? 'disabled' : ''}`}
-								disabled={running}
-								onClick={() => invoke({ name })}
+								className={`button ${translating ? 'disabled' : ''}`}
+								disabled={translating}
+								onClick={handleTranslate}
 								type="button"
 							>
-								{running ? 'Running...' : 'Say Hello'}
+								{translating ? 'Translating...' : 'Translate'}
 							</button>
 						</div>
 					</div>
 
-					<div className="output" data-loading={!greeting}>
-						{greeting ?? 'Waiting for request'}
-					</div>
+					{result ? (
+						<div className="result">
+							<div className="translation-output">{result.translation}</div>
+							<div className="result-meta">
+								<span>
+									Words: <strong>{result.wordCount}</strong>
+								</span>
+								<span className="separator">|</span>
+								<span>
+									Thread: <strong>{result.threadId.slice(0, 12)}...</strong>
+								</span>
+								<span className="separator">|</span>
+								<span>
+									Translations: <strong>{result.translationCount}</strong>
+								</span>
+							</div>
+						</div>
+					) : (
+						<div className="output" data-loading={translating}>
+							{translating ? 'Translating' : 'Enter text and click Translate'}
+						</div>
+					)}
 				</div>
 
+				{result?.history && result.history.length > 0 && (
+					<div className="card">
+						<h3 className="section-title">Recent Translations</h3>
+						<div className="history-list">
+							{result.history.map((entry, index) => (
+								<div key={`${entry.timestamp}-${index}`} className="history-item">
+									<div className="history-text">"{entry.text}"</div>
+									<div className="history-arrow">
+										<span className="history-lang">{entry.toLanguage}</span>
+									</div>
+									<div className="history-translation">"{entry.translation}"</div>
+								</div>
+							))}
+						</div>
+					</div>
+				)}
+
 				<div className="card">
-					<h3 className="section-title">Next Steps</h3>
+					<h3 className="section-title">Features Demonstrated</h3>
 
 					<div className="steps-list">
 						{[
 							{
-								key: 'customize-agent',
-								title: 'Customize your agent',
+								key: 'schemas',
+								title: 'Typed Schemas',
 								text: (
 									<>
-										Edit <code>src/agent/hello/agent.ts</code> to change how your agent
-										responds.
+										Input uses <code>s.string()</code> and <code>s.enum()</code>, output includes{' '}
+										<code>s.number()</code> for word count.
 									</>
 								),
 							},
 							{
-								key: 'add-routes',
-								title: 'Add new API routes',
+								key: 'logs',
+								title: 'Structured Logging',
+								text: <>Agent logs translation requests and completions with metadata.</>,
+							},
+							{
+								key: 'evals',
+								title: 'Automatic Evaluations',
 								text: (
 									<>
-										Create new files in <code>src/web/</code> to expose more endpoints.
+										Two evals run in background: <code>correct-language</code> (binary) and{' '}
+										<code>translation-quality</code> (score).
 									</>
 								),
 							},
 							{
-								key: 'update-frontend',
-								title: 'Update the frontend',
-								text: (
-									<>
-										Modify <code>src/web/App.tsx</code> to build your custom UI.
-									</>
-								),
+								key: 'threads',
+								title: 'Thread State',
+								text: <>Translation history persists across requests using thread state.</>,
 							},
 							WORKBENCH_PATH
 								? {
-										key: 'try-workbench',
+										key: 'workbench',
 										title: (
 											<>
 												Try{' '}
@@ -120,7 +207,7 @@ export function App() {
 												</a>
 											</>
 										),
-										text: <>A chat interface to test your agents in isolation.</>,
+										text: <>Test the translate agent directly in the dev UI.</>,
 									}
 								: null,
 						]
@@ -264,7 +351,7 @@ export function App() {
 						box-shadow: 0 1.5rem 3rem -0.75rem #00000040;
 						display: flex;
 						flex-direction: column;
-						gap: 2rem;
+						gap: 1.5rem;
 						overflow: hidden;
 					}
 
@@ -272,33 +359,72 @@ export function App() {
 						color: #a1a1aa;
 						font-size: 1.25rem;
 						font-weight: 400;
-						line-height: 1;
+						line-height: 1.5;
 						margin: 0;
+					}
+
+					.inline-select {
+						appearance: none;
+						background: transparent;
+						border: none;
+						border-bottom: 1px dashed #3f3f46;
+						color: #fff;
+						cursor: pointer;
+						font-size: inherit;
+						font-weight: 400;
+						outline: none;
+						padding: 0 1.25rem 0.125rem 0;
+						background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+						background-repeat: no-repeat;
+						background-position: right 0 center;
+					}
+
+					.inline-select:hover {
+						border-bottom-color: #22d3ee;
+					}
+
+					.inline-select:focus {
+						border-bottom-color: #22d3ee;
+						border-bottom-style: solid;
+					}
+
+					.inline-select option {
+						background: #09090b;
+						color: #fff;
 					}
 
 					.highlight {
 						color: #fff;
 					}
 
-					.input-group {
+					.form-group {
 						display: flex;
+						flex-direction: column;
 						gap: 1rem;
 					}
 
-					.input {
+					.textarea {
 						background: #09090b;
 						border: 1px solid #2b2b30;
 						border-radius: 0.375rem;
 						color: #fff;
-						flex: 1;
+						font-family: inherit;
+						font-size: 0.95rem;
+						line-height: 1.6;
 						outline: none;
 						padding: 0.75rem 1rem;
-						z-index: 2;
+						resize: vertical;
+						min-height: 100px;
+					}
+
+					.textarea:focus {
+						border-color: #3b82f6;
 					}
 
 					.glow-btn {
 						position: relative;
 						z-index: 1;
+						align-self: flex-start;
 					}
 
 					.glow-bg {
@@ -331,8 +457,7 @@ export function App() {
 						border-radius: 0.5rem;
 						color: #fff;
 						cursor: pointer;
-						height: 100%;
-						padding: 0 1.5rem;
+						padding: 0.75rem 1.5rem;
 						position: relative;
 						transition: opacity 0.2s;
 						white-space: nowrap;
@@ -343,20 +468,50 @@ export function App() {
 						opacity: 0.5;
 					}
 
-					.output {
+					.result {
+						display: flex;
+						flex-direction: column;
+						gap: 0.75rem;
+					}
+
+					.translation-output {
 						background: #09090b;
 						border: 1px solid #2b2b30;
 						border-radius: 0.375rem;
 						color: #22d3ee;
-						flex: 1;
+						font-size: 0.95rem;
+						line-height: 1.6;
+						padding: 0.75rem 1rem;
+					}
+
+					.result-meta {
+						color: #71717a;
+						display: flex;
+						flex-wrap: wrap;
+						font-size: 0.75rem;
+						gap: 0.5rem;
+					}
+
+					.result-meta strong {
+						color: #a1a1aa;
+					}
+
+					.separator {
+						color: #3f3f46;
+					}
+
+					.output {
+						background: #09090b;
+						border: 1px solid #2b2b30;
+						border-radius: 0.375rem;
+						color: #a1a1aa;
 						font-family: monospace;
 						line-height: 1.5;
 						padding: 0.75rem 1rem;
-						z-index: 2;
 					}
 
 					.output[data-loading="true"] {
-						color: #a1a1aa;
+						color: #22d3ee;
 					}
 
 					.section-title {
@@ -365,6 +520,57 @@ export function App() {
 						font-weight: 400;
 						line-height: 1;
 						margin: 0 0 1.5rem 0;
+					}
+
+					.history-list {
+						display: flex;
+						flex-direction: column;
+						gap: 1rem;
+					}
+
+					.history-item {
+						display: flex;
+						align-items: center;
+						gap: 0.75rem;
+						font-size: 0.85rem;
+						flex-wrap: wrap;
+					}
+
+					.history-text {
+						color: #a1a1aa;
+						flex: 1;
+						min-width: 150px;
+						overflow: hidden;
+						text-overflow: ellipsis;
+						white-space: nowrap;
+					}
+
+					.history-arrow {
+						color: #3f3f46;
+						display: flex;
+						align-items: center;
+						gap: 0.5rem;
+					}
+
+					.history-arrow::before {
+						content: '→';
+					}
+
+					.history-lang {
+						background: #18181b;
+						border-radius: 0.25rem;
+						color: #a1a1aa;
+						font-size: 0.75rem;
+						padding: 0.25rem 0.5rem;
+					}
+
+					.history-translation {
+						color: #22d3ee;
+						flex: 1;
+						min-width: 150px;
+						overflow: hidden;
+						text-overflow: ellipsis;
+						white-space: nowrap;
 					}
 
 					.steps-list {
