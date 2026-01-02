@@ -1,3 +1,4 @@
+// Exposes the translate agent via HTTP - validator() auto-validates against the agent's input schema
 import { createRouter } from '@agentuity/runtime';
 import translate from '@agent/translate';
 

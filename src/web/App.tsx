@@ -1,47 +1,23 @@
 import { type ChangeEvent, useCallback, useState } from 'react';
+import { useAPI } from '@agentuity/react';
 
 const WORKBENCH_PATH = process.env.AGENTUITY_PUBLIC_WORKBENCH_PATH;
 
 const DEFAULT_TEXT =
 	'Welcome to Agentuity! This translation agent shows what you can build with the platform. It connects to AI models through our gateway, tracks usage with thread state, and runs quality checks automatically. Try translating this text into different languages to see the agent in action.';
 
-const LANGUAGES = ['Spanish', 'French', 'German', 'Japanese', 'Chinese'] as const;
-
-interface TranslationResponse {
-	translation: string;
-	wordCount: number;
-	tokens: number;
-	threadId: string;
-	translationCount: number;
-}
+const LANGUAGES = ['Spanish', 'French', 'German', 'Chinese'] as const;
 
 export function App() {
 	const [text, setText] = useState(DEFAULT_TEXT);
 	const [toLanguage, setToLanguage] = useState<(typeof LANGUAGES)[number]>('Spanish');
-	const [translating, setTranslating] = useState(false);
-	const [result, setResult] = useState<TranslationResponse | null>(null);
+
+	// useAPI hook handles loading state and response typing automatically
+	const { data: result, invoke, isLoading: translating } = useAPI('POST /api/translate');
 
 	const handleTranslate = useCallback(async () => {
-		setTranslating(true);
-		try {
-			const response = await fetch('/api/translate', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ text, toLanguage }),
-			});
-
-			if (!response.ok) {
-				throw new Error(`HTTP ${response.status}`);
-			}
-
-			const data = await response.json();
-			setResult(data);
-		} catch (error) {
-			console.error('Translation failed:', error);
-		} finally {
-			setTranslating(false);
-		}
-	}, [text, toLanguage]);
+		await invoke({ text, toLanguage });
+	}, [text, toLanguage, invoke]);
 
 	return (
 		<div className="app-container">
@@ -127,30 +103,16 @@ export function App() {
 								{result.translation}
 							</div>
 							<div className="result-meta">
-								<span>
-									Words: <strong>{result.wordCount ?? 0}</strong>
-								</span>
-								{result.tokens > 0 && (
-									<>
-										<span className="separator">|</span>
-										<span>
-											Tokens: <strong>{result.tokens}</strong>
-										</span>
-									</>
-								)}
 								{result.threadId && (
-									<>
-										<span className="separator">|</span>
-										<span>
-											Thread: <strong>{result.threadId.slice(0, 12)}...</strong>
-										</span>
-									</>
+									<span>
+										Thread: <strong>{result.threadId.slice(0, 12)}...</strong>
+									</span>
 								)}
 								{result.translationCount > 0 && (
 									<>
 										<span className="separator">|</span>
 										<span>
-											Session: <strong>{result.translationCount}</strong>
+											Translations: <strong>{result.translationCount}</strong>
 										</span>
 									</>
 								)}
@@ -177,15 +139,20 @@ export function App() {
 								title: 'Typed Schemas',
 								text: (
 									<>
-										Input uses <code>s.string()</code> and <code>s.enum()</code>, output includes{' '}
-										<code>s.number()</code> for word count.
+										Input uses <code>s.string()</code> and <code>s.enum()</code> for type-safe
+										validation.
 									</>
 								),
 							},
 							{
-								key: 'logs',
-								title: 'Structured Logging',
-								text: <>Agent logs translation requests and completions with metadata.</>,
+								key: 'useapi',
+								title: 'useAPI Hook',
+								text: (
+									<>
+										Frontend uses <code>useAPI()</code> for typed API calls with automatic loading
+										state.
+									</>
+								),
 							},
 							{
 								key: 'evals',
