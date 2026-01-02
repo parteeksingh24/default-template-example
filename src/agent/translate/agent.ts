@@ -29,24 +29,19 @@ const agent = createAgent('translate', {
 		const count = ((ctx.thread.state.get('count') as number) ?? 0) + 1;
 		ctx.thread.state.set('count', count);
 
+		const prompt = `Translate to ${toLanguage}:\n\n${text}`;
+
 		const completion = await client.chat.completions.create({
 			model: 'gpt-5-nano',
-			response_format: { type: 'json_object' },
-			messages: [
-				{
-					role: 'system',
-					content: `You are a professional translator. Translate the given text to ${toLanguage}. Respond in JSON: { "translation": "translated text" }`,
-				},
-				{ role: 'user', content: text },
-			],
+			messages: [{ role: 'user', content: prompt }],
 		});
 
-		const result = JSON.parse(completion.choices[0]?.message?.content ?? '{}') as { translation: string };
+		const translation = completion.choices[0]?.message?.content ?? '';
 
 		ctx.logger.info('Translation completed', { tokens: completion.usage?.total_tokens });
 
 		return {
-			translation: result.translation,
+			translation,
 			threadId: ctx.thread.id,
 			translationCount: count,
 		};

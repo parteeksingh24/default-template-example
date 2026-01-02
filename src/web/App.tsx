@@ -97,11 +97,20 @@ export function App() {
 						value={text}
 					/>
 
-					{result?.translation ? (
+					{translating ? (
+						<div className="output">
+							<span className="loading-text">
+								Translating to {toLanguage}
+								<span className="loading-dots">
+									<span>.</span>
+									<span>.</span>
+									<span>.</span>
+								</span>
+							</span>
+						</div>
+					) : result?.translation ? (
 						<div className="result">
-							<div className={`translation-output ${translating ? 'loading' : ''}`}>
-								{result.translation}
-							</div>
+							<div className="translation-output">{result.translation}</div>
 							<div className="result-meta">
 								{result.threadId && (
 									<span>
@@ -119,13 +128,7 @@ export function App() {
 							</div>
 						</div>
 					) : (
-						<div className="output">
-							{translating ? (
-								<span className="loading-text">Translating to {toLanguage}...</span>
-							) : (
-								'Translation will appear here'
-							)}
-						</div>
+						<div className="output">Translation will appear here</div>
 					)}
 				</div>
 
@@ -493,8 +496,18 @@ export function App() {
 						color: #22d3ee;
 					}
 
-					.translation-output.loading {
-						opacity: 0.5;
+					.loading-dots span {
+						animation: blink 1.4s infinite;
+						opacity: 0;
+					}
+
+					.loading-dots span:nth-child(1) { animation-delay: 0s; }
+					.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+					.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+					@keyframes blink {
+						0%, 20% { opacity: 0; }
+						40%, 100% { opacity: 1; }
 					}
 
 					.section-title {
