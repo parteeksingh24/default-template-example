@@ -19,6 +19,7 @@ export const stateSchema = AgentOutput.pick({
 
 // Retrieve translation history
 api.get('/translate/history', validator({ output: stateSchema }), async (c) => {
+	// Routes use c.var.* for Agentuity services (thread, kv, logger); agents use ctx.* directly
 	const history = (await c.var.thread.state.get<HistoryEntry[]>('history')) ?? [];
 	return c.json({
 		history,

@@ -44,6 +44,7 @@ export const AgentOutput = z.object({
 });
 export type AgentOutputType = z.infer<typeof AgentOutput>;
 
+// Agent definition with automatic schema validation
 const agent = createAgent('translate', {
 	description: 'Translates text to different languages',
 	schema: {
