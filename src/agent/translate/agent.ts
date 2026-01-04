@@ -1,10 +1,9 @@
 /**
  * Translation Agent: translates text using AI models via the Agentuity AI Gateway.
- * Demonstrates thread state, sessions, structured logging, and end-to-end type safety.
- * Uses @agentuity/schema (built-in, zero dependencies) for input/output validation.
+ * Stores translation history in thread state for persistence across requests.
  */
 import { createAgent } from '@agentuity/runtime';
-import { s } from '@agentuity/schema';
+import { z } from 'zod';
 import OpenAI from 'openai';
 
 /**
@@ -17,41 +16,33 @@ const LANGUAGES = ['Spanish', 'French', 'German', 'Chinese'] as const;
 const MODELS = ['gpt-5-nano', 'gpt-5-mini', 'gpt-5'] as const;
 
 // History entry stored in thread state
-interface HistoryEntry {
-	text: string;
-	toLanguage: string;
-	translation: string;
-	sessionId: string;
-	timestamp: string;
-	model: string;
-	tokens: number;
-}
-
-export const AgentInput = s.object({
-	text: s.optional(s.string()),
-	toLanguage: s.optional(s.enum(LANGUAGES)),
-	model: s.optional(s.enum(MODELS)),
-	command: s.optional(s.enum(['translate', 'clear'])),
+export const HistoryEntrySchema = z.object({
+	text: z.string(),
+	toLanguage: z.string(),
+	translation: z.string(),
+	sessionId: z.string(),
+	timestamp: z.string(),
+	model: z.string(),
+	tokens: z.number(),
 });
+export type HistoryEntry = z.infer<typeof HistoryEntrySchema>;
 
-export const AgentOutput = s.object({
-	translation: s.string(),
-	threadId: s.string(),
-	sessionId: s.string(),
-	translationCount: s.number(),
-	tokens: s.number(),
-	history: s.array(
-		s.object({
-			text: s.string(),
-			toLanguage: s.string(),
-			translation: s.string(),
-			sessionId: s.string(),
-			timestamp: s.string(),
-			model: s.string(),
-			tokens: s.number(),
-		})
-	),
+export const AgentInput = z.object({
+	text: z.string(),
+	toLanguage: z.enum(LANGUAGES).optional(),
+	model: z.enum(MODELS).optional(),
 });
+export type AgentInputType = z.infer<typeof AgentInput>;
+
+export const AgentOutput = z.object({
+	translation: z.string(),
+	threadId: z.string(),
+	sessionId: z.string(),
+	translationCount: z.number(),
+	tokens: z.number(),
+	history: z.array(HistoryEntrySchema),
+});
+export type AgentOutputType = z.infer<typeof AgentOutput>;
 
 const agent = createAgent('translate', {
 	description: 'Translates text to different languages',
@@ -59,35 +50,7 @@ const agent = createAgent('translate', {
 		input: AgentInput,
 		output: AgentOutput,
 	},
-	handler: async (ctx, { text, toLanguage = 'Spanish', model = 'gpt-5-nano', command = 'translate' }) => {
-		// Handle clear command
-		if (command === 'clear') {
-			// Thread state: persists across requests in this conversation (up to 1 hour)
-			await ctx.thread.state.delete('history');
-			ctx.logger.info('History cleared');
-			return {
-				translation: '',
-				threadId: ctx.thread.id,
-				sessionId: ctx.sessionId,
-				translationCount: 0,
-				tokens: 0,
-				history: [],
-			};
-		}
-
-		// No text provided: return current state (history)
-		if (!text) {
-			const history = (await ctx.thread.state.get<HistoryEntry[]>('history')) ?? [];
-			return {
-				translation: '',
-				threadId: ctx.thread.id,
-				sessionId: ctx.sessionId,
-				translationCount: history.length,
-				tokens: 0,
-				history,
-			};
-		}
-
+	handler: async (ctx, { text, toLanguage = 'Spanish', model = 'gpt-5-nano' }) => {
 		// Agentuity logger: structured logs visible in terminal and Agentuity console
 		ctx.logger.info('──── Translation ────');
 		ctx.logger.info({ toLanguage, model, textLength: text.length });
