@@ -4,7 +4,8 @@
  * The agent has single responsibility (translate), routes handle state operations.
  */
 import { createRouter, validator } from '@agentuity/runtime';
-import translate from '@agent/translate';
+// Import from eval.ts to ensure evals are registered with the agent
+import translate from '../agent/translate/eval';
 import { AgentOutput, type HistoryEntry } from '../agent/translate/agent';
 
 const api = createRouter();
