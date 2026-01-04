@@ -1,4 +1,7 @@
-// Exposes the translate agent via HTTP - validator() auto-validates against the agent's input schema
+/**
+ * API route that exposes the translation agent.
+ * The agent handles all actions (translate, history, clear) via its input schema.
+ */
 import { createRouter } from '@agentuity/runtime';
 import translate from '@agent/translate';
 

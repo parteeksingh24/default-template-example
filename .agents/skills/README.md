@@ -12,7 +12,7 @@ Learn more at the [Agent Skills Specification](https://agentskills.io/specificat
 ## Generated From
 
 - **CLI Version**: 0.0.110
-- **Generated**: 2026-01-03
+- **Generated**: 2026-01-04
 - **Total Skills**: 104
 
 ## Available Skills
